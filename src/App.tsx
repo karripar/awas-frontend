@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useAwasDemoState, type PostRecord } from "./hooks/useAwasDemoState.ts";
 import { AppHeader } from "./components/AppHeader.tsx";
 import { AuthPanel } from "./components/AuthPanel.tsx";
@@ -62,6 +62,17 @@ function App() {
   }, [posts, search, session.user?.id, session.user?.role]);
 
   const signedIn = Boolean(session.user);
+  const isAdmin = session.user?.role === "admin";
+
+  useEffect(() => {
+    // If user loses admin privileges while admin view is active, reset to feed.
+
+    // cascading renders (React warning). setTimeout defers to next tick.
+    if (!isAdmin && activeView === "admin") {
+      const t = setTimeout(() => setActiveView("feed"), 0);
+      return () => clearTimeout(t);
+    }
+  }, [isAdmin, activeView]);
 
   if (!signedIn) {
     return (
@@ -78,11 +89,14 @@ function App() {
             form={authForm}
             onModeChange={setAuthMode}
             onFormChange={setAuthForm}
-            onSubmit={(submittedForm) => {
+            onSubmit={async (submittedForm) => {
               const result =
                 authMode === "login"
-                  ? login(submittedForm.username.trim(), submittedForm.password)
-                  : register({
+                  ? await login(
+                      submittedForm.username.trim(),
+                      submittedForm.password,
+                    )
+                  : await register({
                       username: submittedForm.username.trim(),
                       email: submittedForm.email.trim(),
                       password: submittedForm.password,
@@ -153,17 +167,19 @@ function App() {
                 >
                   Feed
                 </button>
-                <button
-                  type="button"
-                  className={
-                    activeView === "admin"
-                      ? "rounded-full bg-white px-4 py-2 text-sm font-medium shadow-sm"
-                      : "rounded-full px-4 py-2 text-sm text-slate-600"
-                  }
-                  onClick={() => setActiveView("admin")}
-                >
-                  Admin
-                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    className={
+                      activeView === "admin"
+                        ? "rounded-full bg-white px-4 py-2 text-sm font-medium shadow-sm"
+                        : "rounded-full px-4 py-2 text-sm text-slate-600"
+                    }
+                    onClick={() => setActiveView("admin")}
+                  >
+                    Admin
+                  </button>
+                )}
               </div>
             </div>
 
@@ -172,8 +188,8 @@ function App() {
                 signedIn={signedIn}
                 postForm={postForm}
                 onPostFormChange={setPostForm}
-                onSubmit={(submittedForm) => {
-                  const result = createPost(submittedForm);
+                onSubmit={async (submittedForm) => {
+                  const result = await createPost(submittedForm);
                   setNotice(result.message);
 
                   if (result.ok) {
@@ -183,16 +199,22 @@ function App() {
                 posts={visiblePosts}
                 onDeletePost={deletePost}
               />
-            ) : (
-              <AdminPanel
-                users={users}
-                posts={posts}
-                onDeletePost={deletePost}
-                onDeleteUser={deleteUser}
-                onPromoteUser={promoteUser}
-                onDemoteUser={demoteUser}
-              />
-            )}
+            ) : activeView === "admin" ? (
+              isAdmin ? (
+                <AdminPanel
+                  users={users}
+                  posts={posts}
+                  onDeletePost={deletePost}
+                  onDeleteUser={deleteUser}
+                  onPromoteUser={promoteUser}
+                  onDemoteUser={demoteUser}
+                />
+              ) : (
+                <p className="text-sm text-slate-600">
+                  You are not authorized to view this panel.
+                </p>
+              )
+            ) : null}
           </section>
         </section>
       </div>
