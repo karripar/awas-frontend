@@ -1,7 +1,8 @@
 
 create .env and copy the contents of .env.sample to it. Then fill in the values for the environment variables.
 
-```bashcp .env.sample .env
+```bash
+cp .env.sample .env
 ``` 
 
 Then install the dependencies and start the server.
