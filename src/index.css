@@ -2,11 +2,13 @@
 
 :root {
   font-family:
-    Inter,
+    "Helvetica Neue",
+    Helvetica,
+    Arial,
+    ui-sans-serif,
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
-    "Segoe UI",
     sans-serif;
   color-scheme: light;
   font-synthesis: none;
@@ -30,12 +32,42 @@
 
 body {
   margin: 0;
-  background: #f8fafc;
-  color: #0f172a;
+  background: #f7f7f8;
+  color: #111111;
 }
 
 button,
 input,
 textarea {
   font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+::selection {
+  background: #e4002b;
+  color: #ffffff;
+}
+
+.swiss-grid {
+  background-color: #f7f7f8;
+  background-image:
+    linear-gradient(to right, rgba(17, 17, 17, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(17, 17, 17, 0.08) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.swiss-focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.swiss-focus:focus-visible {
+  outline-color: #e4002b;
 }

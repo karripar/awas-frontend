@@ -23,37 +23,32 @@ export function AuthPanel({
   onFormChange,
   onSubmit,
 }: AuthPanelProps) {
+  const modeButtonClass = (isActive: boolean) =>
+    isActive
+      ? "swiss-focus border border-[#111111] bg-[#111111] px-4 py-2 text-sm font-semibold text-white"
+      : "swiss-focus border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-700 hover:border-[#111111] hover:text-[#111111]";
+
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 lg:self-start">
-      <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
+    <section className="w-full border border-neutral-300 bg-white p-5">
+      <div className="mb-5 flex items-start justify-between gap-3 border-b border-neutral-300 pb-5">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-            Access
-          </p>
-          <h2 className="text-base font-semibold text-slate-900">
+          <p className="text-sm text-neutral-500">Account</p>
+          <h2 className="text-2xl font-bold leading-tight text-[#111111]">
             {mode === "login" ? "Login" : "Register"}
           </h2>
         </div>
 
-        <div className="inline-flex rounded-full bg-slate-100 p-1">
+        <div className="inline-flex">
           <button
             type="button"
-            className={
-              mode === "login"
-                ? "rounded-full bg-white px-3 py-1.5 text-sm font-medium shadow-sm"
-                : "rounded-full px-3 py-1.5 text-sm text-slate-600"
-            }
+            className={modeButtonClass(mode === "login")}
             onClick={() => onModeChange("login")}
           >
             Login
           </button>
           <button
             type="button"
-            className={
-              mode === "register"
-                ? "rounded-full bg-white px-3 py-1.5 text-sm font-medium shadow-sm"
-                : "rounded-full px-3 py-1.5 text-sm text-slate-600"
-            }
+            className={modeButtonClass(mode === "register")}
             onClick={() => onModeChange("register")}
           >
             Register
@@ -62,16 +57,16 @@ export function AuthPanel({
       </div>
 
       <form
-        className="space-y-3"
+        className="space-y-5"
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit(form);
         }}
       >
-        <label className="block text-sm font-medium text-slate-700">
+        <label className="block text-sm font-semibold text-[#111111]">
           Username
           <input
-            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:border-slate-300"
+            className="swiss-focus mt-2 w-full border border-neutral-300 bg-white px-3 py-3 text-[#111111] transition focus:border-[#111111]"
             value={form.username}
             onChange={(event) =>
               onFormChange((current) => ({
@@ -84,10 +79,10 @@ export function AuthPanel({
         </label>
 
         {mode === "register" ? (
-          <label className="block text-sm font-medium text-slate-700">
+          <label className="block text-sm font-semibold text-[#111111]">
             Email
             <input
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:border-slate-300"
+              className="swiss-focus mt-2 w-full border border-neutral-300 bg-white px-3 py-3 text-[#111111] transition focus:border-[#111111]"
               type="email"
               value={form.email}
               onChange={(event) =>
@@ -101,10 +96,10 @@ export function AuthPanel({
           </label>
         ) : null}
 
-        <label className="block text-sm font-medium text-slate-700">
+        <label className="block text-sm font-semibold text-[#111111]">
           Password
           <input
-            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:border-slate-300"
+            className="swiss-focus mt-2 w-full border border-neutral-300 bg-white px-3 py-3 text-[#111111] transition focus:border-[#111111]"
             type="password"
             value={form.password}
             onChange={(event) =>
@@ -119,7 +114,7 @@ export function AuthPanel({
 
         <button
           type="submit"
-          className="w-full rounded-lg bg-slate-900 px-3 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+          className="swiss-focus w-full border border-[#111111] bg-[#111111] px-3 py-3 text-sm font-semibold text-white hover:bg-[#E4002B]"
         >
           {mode === "login" ? "Sign in" : "Create account"}
         </button>

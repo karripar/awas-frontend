@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  dispatchSessionChanged,
+  readSessionFromStorage,
+  setSessionInStorage,
+} from "../lib/session.ts";
 
-// Vite exposes environment variables via import.meta.env and requires the VITE_ prefix
 declare global {
   interface ImportMetaEnv {
     readonly VITE_API_BASE_URL?: string;
-    readonly VITE_SESSION_KEY?: string;
     readonly VITE_USER_ID_KEY?: string;
   }
   interface ImportMeta {
@@ -14,7 +17,6 @@ declare global {
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000/api";
-import { SESSION_KEY, dispatchSessionChanged, setSessionInStorage } from "../lib/session.ts";
 const USER_ID_KEY = import.meta.env.VITE_USER_ID_KEY ?? "awas.user_id";
 
 export type Role = "user" | "admin";
@@ -106,25 +108,13 @@ const defaultSession: SessionState = {
 };
 
 function loadSession(): SessionState {
-  if (typeof window === "undefined") {
+  const parsedSession = readSessionFromStorage() as SessionState | null;
+
+  if (!parsedSession?.user) {
     return defaultSession;
   }
 
-  try {
-    const rawSession = window.localStorage.getItem(SESSION_KEY);
-    if (!rawSession) {
-      return defaultSession;
-    }
-
-    const parsedSession = JSON.parse(rawSession) as SessionState;
-    if (!parsedSession?.user) {
-      return defaultSession;
-    }
-
-    return parsedSession;
-  } catch {
-    return defaultSession;
-  }
+  return parsedSession;
 }
 
 function convertPostRecord(post: ApiPostRecord): PostRecord {
@@ -141,7 +131,8 @@ function convertPostRecord(post: ApiPostRecord): PostRecord {
 }
 
 export function useBlogApi() {
-  const [posts, setPosts] = useState<PostRecord[]>([]);
+  const [feedPosts, setFeedPosts] = useState<PostRecord[]>([]);
+  const [searchResults, setSearchResults] = useState<PostRecord[]>([]);
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [session, setSession] = useState<SessionState>(loadSession);
   const [isLoading, setIsLoading] = useState(false);
@@ -150,39 +141,8 @@ export function useBlogApi() {
   const sessionUserId = session.user?.id || "";
   const sessionRole = session.user?.role;
 
-  const loadPosts = useCallback(
-    async (search = "") => {
-      const query = search.trim();
-      const searchParam = query ? `?search=${encodeURIComponent(query)}` : "";
-
-      try {
-        const response = await fetch(`${API_BASE_URL}/feed${searchParam}`, {
-          headers: {
-            "X-User-ID": sessionUserId,
-          },
-        });
-        if (response.ok) {
-          const data = (await response.json()) as ApiPostsResponse;
-          setPosts((data.posts || []).map(convertPostRecord));
-        }
-      } catch (error) {
-        console.error("Failed to load posts:", error);
-      }
-    },
-    [sessionUserId],
-  );
-
-  // Save session to localStorage
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    dispatchSessionChanged(session);
-    setSessionInStorage(session);
-  }, [session]);
-
-  useEffect(() => {
-    const fetchPosts = async () => {
+  const loadFeedPosts = useCallback(
+    async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/feed`, {
           headers: {
@@ -191,16 +151,81 @@ export function useBlogApi() {
         });
         if (response.ok) {
           const data = (await response.json()) as ApiPostsResponse;
-          setPosts((data.posts || []).map(convertPostRecord));
+          setFeedPosts((data.posts || []).map(convertPostRecord));
         }
       } catch (error) {
         console.error("Failed to load posts:", error);
       }
-    };
-    fetchPosts();
-  }, [sessionUserId]);
+    },
+    [sessionUserId],
+  );
 
-  // Load users for admin panel
+  const searchPosts = useCallback(
+    async (search: string): Promise<AuthResult> => {
+      const query = search.trim();
+
+      if (!query) {
+        setSearchResults([]);
+        return { ok: false, message: "Enter a search term." };
+      }
+
+      setIsLoading(true);
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/feed?search=${encodeURIComponent(query)}`,
+          {
+            headers: {
+              "X-User-ID": sessionUserId,
+            },
+          },
+        );
+        const data: ApiPostsResponse | ApiErrorResponse = await response.json();
+
+        if (!response.ok) {
+          const errorData = data as ApiErrorResponse;
+          return {
+            ok: false,
+            message: errorData.error || "Search failed",
+          };
+        }
+
+        const nextResults = ((data as ApiPostsResponse).posts || []).map(
+          convertPostRecord,
+        );
+        setSearchResults(nextResults);
+
+        return {
+          ok: true,
+          message: `Found ${nextResults.length} post${
+            nextResults.length === 1 ? "" : "s"
+          }.`,
+        };
+      } catch {
+        return { ok: false, message: "Network error" };
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [sessionUserId],
+  );
+
+  const clearSearchResults = useCallback(() => {
+    setSearchResults([]);
+  }, []);
+
+  useEffect(() => {
+    dispatchSessionChanged(session);
+    setSessionInStorage(session);
+  }, [session]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadFeedPosts();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [loadFeedPosts]);
+
   useEffect(() => {
     if (sessionRole !== "admin") {
       const timer = window.setTimeout(() => setUsers([]), 0);
@@ -227,7 +252,7 @@ export function useBlogApi() {
               id: u.user_id,
               username: u.username,
               email: u.email,
-              password: "", // password not returned
+              password: "",
               role: u.role as Role,
             })),
           );
@@ -371,7 +396,7 @@ export function useBlogApi() {
           };
         }
 
-        await loadPosts();
+        await loadFeedPosts();
 
         return { ok: true, message: "Post published." };
       } catch {
@@ -380,7 +405,7 @@ export function useBlogApi() {
         setIsLoading(false);
       }
     },
-    [loadPosts, sessionUser],
+    [loadFeedPosts, sessionUser],
   );
 
   const deletePost = useCallback(
@@ -397,25 +422,75 @@ export function useBlogApi() {
           }),
         });
 
-        if (response.status === 403) {
-          return false;
-        }
-
         if (!response.ok) {
           return false;
         }
 
-        setPosts((currentPosts) =>
+        setFeedPosts((currentPosts) =>
+          currentPosts.filter((post) => post.id !== postId),
+        );
+        setSearchResults((currentPosts) =>
           currentPosts.filter((post) => post.id !== postId),
         );
 
         return true;
       } catch {
-        // Silently fail
         return false;
       }
     },
     [sessionUser],
+  );
+
+  const updatePost = useCallback(
+    async (
+      postId: string,
+      { title, text, privatePost }: PostInput,
+    ): Promise<AuthResult> => {
+      if (!sessionUser) {
+        return { ok: false, message: "Sign in before editing." };
+      }
+
+      if (!title.trim() || !text.trim()) {
+        return { ok: false, message: "Title and message are required." };
+      }
+
+      setIsLoading(true);
+      try {
+        const response = await fetch(`${API_BASE_URL}/feed/${postId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-User-ID": sessionUser.id,
+          },
+          body: JSON.stringify({
+            user_id: sessionUser.id,
+            title: title.trim(),
+            text: text.trim(),
+            private: privatePost,
+          }),
+        });
+
+        const data: ApiMessageResponse | ApiErrorResponse =
+          await response.json();
+
+        if (!response.ok) {
+          const errorData = data as ApiErrorResponse;
+          return {
+            ok: false,
+            message: errorData.error || "Failed to update post",
+          };
+        }
+
+        await loadFeedPosts();
+
+        return { ok: true, message: "Post updated." };
+      } catch {
+        return { ok: false, message: "Network error" };
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [loadFeedPosts, sessionUser],
   );
 
   const deleteUser = useCallback(
@@ -432,7 +507,10 @@ export function useBlogApi() {
           }),
         });
 
-        setPosts((currentPosts) =>
+        setFeedPosts((currentPosts) =>
+          currentPosts.filter((post) => post.userId !== userId),
+        );
+        setSearchResults((currentPosts) =>
           currentPosts.filter((post) => post.userId !== userId),
         );
 
@@ -440,7 +518,7 @@ export function useBlogApi() {
           logout();
         }
       } catch {
-        // Silently fail
+        // Silently fail.
       }
     },
     [sessionUser, logout],
@@ -469,7 +547,7 @@ export function useBlogApi() {
           });
         }
       } catch {
-        // Silently fail
+        // Silently fail.
       }
     },
     [sessionUser],
@@ -498,7 +576,7 @@ export function useBlogApi() {
           });
         }
       } catch {
-        // Silently fail
+        // Silently fail.
       }
     },
     [sessionUser],
@@ -506,13 +584,17 @@ export function useBlogApi() {
 
   return {
     users,
-    posts,
+    feedPosts,
+    searchResults,
     session,
     login,
     register,
     logout,
-    loadPosts,
+    loadFeedPosts,
+    searchPosts,
+    clearSearchResults,
     createPost,
+    updatePost,
     deletePost,
     deleteUser,
     promoteUser,
