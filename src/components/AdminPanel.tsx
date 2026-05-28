@@ -3,7 +3,7 @@ import type { PostRecord, UserRecord } from "../hooks/useBlogApi.ts";
 type AdminPanelProps = {
   users: UserRecord[];
   posts: PostRecord[];
-  onDeletePost: (postId: string) => void;
+  onDeletePost: (postId: string) => Promise<boolean>;
   onDeleteUser: (userId: string) => void;
   onPromoteUser: (userId: string) => void;
   onDemoteUser: (userId: string) => void;

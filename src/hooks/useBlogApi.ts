@@ -14,7 +14,7 @@ declare global {
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000/api";
-const SESSION_KEY = import.meta.env.VITE_SESSION_KEY ?? "awas.session";
+import { SESSION_KEY, dispatchSessionChanged, setSessionInStorage } from "../lib/session.ts";
 const USER_ID_KEY = import.meta.env.VITE_USER_ID_KEY ?? "awas.user_id";
 
 export type Role = "user" | "admin";
@@ -153,9 +153,7 @@ export function useBlogApi() {
   const loadPosts = useCallback(
     async (search = "") => {
       const query = search.trim();
-      const searchParam = query
-        ? `?search=${encodeURIComponent(query)}`
-        : "";
+      const searchParam = query ? `?search=${encodeURIComponent(query)}` : "";
 
       try {
         const response = await fetch(`${API_BASE_URL}/feed${searchParam}`, {
@@ -179,7 +177,8 @@ export function useBlogApi() {
     if (typeof window === "undefined") {
       return;
     }
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    dispatchSessionChanged(session);
+    setSessionInStorage(session);
   }, [session]);
 
   useEffect(() => {
@@ -385,11 +384,11 @@ export function useBlogApi() {
   );
 
   const deletePost = useCallback(
-    async (postId: string) => {
-      if (!sessionUser) return;
+    async (postId: string): Promise<boolean> => {
+      if (!sessionUser) return false;
 
       try {
-        await fetch(`${API_BASE_URL}/admin/feed/delete`, {
+        const response = await fetch(`${API_BASE_URL}/admin/feed/delete`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -398,11 +397,22 @@ export function useBlogApi() {
           }),
         });
 
+        if (response.status === 403) {
+          return false;
+        }
+
+        if (!response.ok) {
+          return false;
+        }
+
         setPosts((currentPosts) =>
           currentPosts.filter((post) => post.id !== postId),
         );
+
+        return true;
       } catch {
         // Silently fail
+        return false;
       }
     },
     [sessionUser],

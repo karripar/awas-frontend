@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
+import { useAuth } from "../context/useAuth";
 import type { PostRecord } from "../hooks/useBlogApi.ts";
 
 type PostFormState = {
@@ -13,7 +14,7 @@ type FeedPanelProps = {
   onPostFormChange: Dispatch<SetStateAction<PostFormState>>;
   onSubmit: (form: PostFormState) => void;
   posts: PostRecord[];
-  onDeletePost: (postId: string) => void;
+  onDeletePost: (postId: string) => Promise<boolean>;
 };
 
 export function FeedPanel({
@@ -24,6 +25,19 @@ export function FeedPanel({
   posts,
   onDeletePost,
 }: FeedPanelProps) {
+  const { user } = useAuth();
+
+  const handlePostDelete = async (postId: string) => {
+    if (!window.confirm("Are you sure you want to delete this post?")) {
+      return;
+    }
+
+    const result = await onDeletePost(postId);
+    if (!result) {
+      alert("You do not have permission to delete this post.");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <form
@@ -118,13 +132,15 @@ export function FeedPanel({
                   <span className="rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-500">
                     {post.private ? "Private" : "Public"}
                   </span>
-                  <button
-                    type="button"
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-                    onClick={() => onDeletePost(post.id)}
-                  >
-                    Delete
-                  </button>
+                  {user && user.id === post.userId ? (
+                    <button
+                      type="button"
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                      onClick={() => void handlePostDelete(post.id)}
+                    >
+                      Delete
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </article>
