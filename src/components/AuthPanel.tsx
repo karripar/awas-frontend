@@ -79,7 +79,7 @@ export function AuthPanel({
                 username: event.target.value,
               }))
             }
-            autoComplete="username"
+            
           />
         </label>
 
@@ -96,7 +96,7 @@ export function AuthPanel({
                   email: event.target.value,
                 }))
               }
-              autoComplete="email"
+             
             />
           </label>
         ) : null}
@@ -113,9 +113,7 @@ export function AuthPanel({
                 password: event.target.value,
               }))
             }
-            autoComplete={
-              mode === "login" ? "current-password" : "new-password"
-            }
+            
           />
         </label>
 

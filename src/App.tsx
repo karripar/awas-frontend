@@ -29,9 +29,9 @@ function App() {
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState("");
   const [authForm, setAuthForm] = useState({
-    username: "joel",
+    username: "",
     email: "",
-    password: "demo123",
+    password: "",
   });
   const [postForm, setPostForm] = useState({
     title: "",
@@ -100,7 +100,10 @@ function App() {
           username={session.user?.username ?? "Guest"}
           role={session.user?.role ?? "Not signed in"}
           signedIn={signedIn}
-          onLogout={logout}
+          onLogout={() => {
+            logout();
+            setNotice("");
+          }}
         />
 
         {notice ? (
