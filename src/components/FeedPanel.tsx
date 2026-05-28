@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { PostRecord } from "../hooks/useAwasDemoState.ts";
+import type { PostRecord } from "../hooks/useBlogApi.ts";
 
 type PostFormState = {
   title: string;

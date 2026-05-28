@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from "react";
-import { useAwasDemoState, type PostRecord } from "./hooks/useAwasDemoState.ts";
+import { useState, useEffect } from "react";
+import { useBlogApi } from "./hooks/useBlogApi.ts";
 import { AppHeader } from "./components/AppHeader.tsx";
 import { AuthPanel } from "./components/AuthPanel.tsx";
 import { FeedPanel } from "./components/FeedPanel.tsx";
@@ -16,50 +16,28 @@ function App() {
     login,
     logout,
     register,
+    loadPosts,
     createPost,
     deletePost,
     deleteUser,
     promoteUser,
     demoteUser,
-  } = useAwasDemoState();
+  } = useBlogApi();
 
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [activeView, setActiveView] = useState<PanelView>("feed");
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState("");
   const [authForm, setAuthForm] = useState({
-    username: "admin",
+    username: "joel",
     email: "",
-    password: "admin123",
+    password: "demo123",
   });
   const [postForm, setPostForm] = useState({
     title: "",
     text: "",
     privatePost: false,
   });
-
-  const visiblePosts = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    return posts
-      .filter((post: PostRecord) => {
-        const searchHit =
-          query.length === 0 ||
-          [post.title, post.text, post.authorName].some((value) =>
-            value.toLowerCase().includes(query),
-          );
-
-        const canSeePrivate =
-          !post.private ||
-          session.user?.role === "admin" ||
-          session.user?.id === post.userId;
-
-        return searchHit && canSeePrivate;
-      })
-      .sort((left: PostRecord, right: PostRecord) =>
-        right.createdAt.localeCompare(left.createdAt),
-      );
-  }, [posts, search, session.user?.id, session.user?.role]);
 
   const signedIn = Boolean(session.user);
   const isAdmin = session.user?.role === "admin";
@@ -132,15 +110,41 @@ function App() {
         ) : null}
 
         {activeView === "feed" ? (
-          <label className="block rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm">
-            Search posts
-            <input
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:border-slate-300"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search titles, text, or authors"
-            />
-          </label>
+          <form
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void loadPosts(search);
+            }}
+          >
+            <label className="block text-sm font-medium text-slate-700">
+              Search posts
+              <input
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:border-slate-300"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search titles, text, or authors"
+              />
+            </label>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="submit"
+                className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                Search
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                onClick={() => {
+                  setSearch("");
+                  void loadPosts();
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          </form>
         ) : null}
 
         <section className="grid gap-4">
@@ -196,7 +200,7 @@ function App() {
                     setPostForm({ title: "", text: "", privatePost: false });
                   }
                 }}
-                posts={visiblePosts}
+                posts={posts}
                 onDeletePost={deletePost}
               />
             ) : activeView === "admin" ? (

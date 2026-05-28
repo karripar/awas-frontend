@@ -1,4 +1,4 @@
-import type { PostRecord, UserRecord } from "../hooks/useAwasDemoState.ts";
+import type { PostRecord, UserRecord } from "../hooks/useBlogApi.ts";
 
 type AdminPanelProps = {
   users: UserRecord[];

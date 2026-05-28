@@ -140,13 +140,39 @@ function convertPostRecord(post: ApiPostRecord): PostRecord {
   };
 }
 
-export function useAwasDemoState() {
+export function useBlogApi() {
   const [posts, setPosts] = useState<PostRecord[]>([]);
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [session, setSession] = useState<SessionState>(loadSession);
   const [isLoading, setIsLoading] = useState(false);
 
   const sessionUser = useMemo(() => session.user, [session.user]);
+  const sessionUserId = session.user?.id || "";
+  const sessionRole = session.user?.role;
+
+  const loadPosts = useCallback(
+    async (search = "") => {
+      const query = search.trim();
+      const searchParam = query
+        ? `?search=${encodeURIComponent(query)}`
+        : "";
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/feed${searchParam}`, {
+          headers: {
+            "X-User-ID": sessionUserId,
+          },
+        });
+        if (response.ok) {
+          const data = (await response.json()) as ApiPostsResponse;
+          setPosts((data.posts || []).map(convertPostRecord));
+        }
+      } catch (error) {
+        console.error("Failed to load posts:", error);
+      }
+    },
+    [sessionUserId],
+  );
 
   // Save session to localStorage
   useEffect(() => {
@@ -156,13 +182,12 @@ export function useAwasDemoState() {
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   }, [session]);
 
-  // Load initial posts on mount
   useEffect(() => {
     const fetchPosts = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/feed`, {
           headers: {
-            "X-User-ID": session.user?.id || "",
+            "X-User-ID": sessionUserId,
           },
         });
         if (response.ok) {
@@ -174,14 +199,19 @@ export function useAwasDemoState() {
       }
     };
     fetchPosts();
-  }, [session.user?.id]);
+  }, [sessionUserId]);
 
   // Load users for admin panel
   useEffect(() => {
+    if (sessionRole !== "admin") {
+      const timer = window.setTimeout(() => setUsers([]), 0);
+      return () => window.clearTimeout(timer);
+    }
+
     const fetchUsers = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/admin/users`, {
-          headers: { "X-User-ID": session.user?.id || "" },
+          headers: { "X-User-ID": sessionUserId },
         });
         if (response.ok) {
           const data = (await response.json()) as {
@@ -209,7 +239,7 @@ export function useAwasDemoState() {
     };
 
     fetchUsers();
-  }, [session.user?.id]);
+  }, [sessionRole, sessionUserId]);
 
   const login = useCallback(
     async (username: string, password: string): Promise<AuthResult> => {
@@ -342,14 +372,7 @@ export function useAwasDemoState() {
           };
         }
 
-        // Refresh posts
-        const feedResponse = await fetch(`${API_BASE_URL}/feed`, {
-          headers: { "X-User-ID": sessionUser.id },
-        });
-        if (feedResponse.ok) {
-          const feedData = (await feedResponse.json()) as ApiPostsResponse;
-          setPosts((feedData.posts || []).map(convertPostRecord));
-        }
+        await loadPosts();
 
         return { ok: true, message: "Post published." };
       } catch {
@@ -358,7 +381,7 @@ export function useAwasDemoState() {
         setIsLoading(false);
       }
     },
-    [sessionUser],
+    [loadPosts, sessionUser],
   );
 
   const deletePost = useCallback(
@@ -478,6 +501,7 @@ export function useAwasDemoState() {
     login,
     register,
     logout,
+    loadPosts,
     createPost,
     deletePost,
     deleteUser,
