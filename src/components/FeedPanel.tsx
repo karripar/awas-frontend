@@ -132,7 +132,7 @@ export function FeedPanel({
                   <span className="rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-500">
                     {post.private ? "Private" : "Public"}
                   </span>
-                  {user && user.id === post.userId ? (
+                  {user && (user.id === post.userId || user.role === "admin") ? (
                     <button
                       type="button"
                       className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"

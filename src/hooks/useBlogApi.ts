@@ -4,8 +4,6 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 declare global {
   interface ImportMetaEnv {
     readonly VITE_API_BASE_URL?: string;
-    readonly VITE_SESSION_KEY?: string;
-    readonly VITE_USER_ID_KEY?: string;
   }
   interface ImportMeta {
     readonly env: ImportMetaEnv;
@@ -14,8 +12,11 @@ declare global {
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000/api";
-import { SESSION_KEY, dispatchSessionChanged, setSessionInStorage } from "../lib/session.ts";
-const USER_ID_KEY = import.meta.env.VITE_USER_ID_KEY ?? "awas.user_id";
+import {
+  clearSessionState,
+  readSessionState,
+  setSessionState,
+} from "../lib/session.ts";
 
 export type Role = "user" | "admin";
 
@@ -78,15 +79,26 @@ type ApiLoginResponse = {
   user_id: string;
   username: string;
   role: Role;
-  session_token: string;
   message: string;
 };
 
 type ApiRegisterResponse = {
   user_id: string;
   username: string;
+  role: Role;
   message: string;
 };
+
+type ApiSessionResponse =
+  | {
+      user_id: string;
+      username: string;
+      role: Role;
+      email: string;
+    }
+  | {
+      user: null;
+    };
 
 type ApiErrorResponse = {
   error: string;
@@ -106,25 +118,8 @@ const defaultSession: SessionState = {
 };
 
 function loadSession(): SessionState {
-  if (typeof window === "undefined") {
-    return defaultSession;
-  }
-
-  try {
-    const rawSession = window.localStorage.getItem(SESSION_KEY);
-    if (!rawSession) {
-      return defaultSession;
-    }
-
-    const parsedSession = JSON.parse(rawSession) as SessionState;
-    if (!parsedSession?.user) {
-      return defaultSession;
-    }
-
-    return parsedSession;
-  } catch {
-    return defaultSession;
-  }
+  const parsedSession = readSessionState() as SessionState;
+  return parsedSession?.user ? parsedSession : defaultSession;
 }
 
 function convertPostRecord(post: ApiPostRecord): PostRecord {
@@ -150,44 +145,65 @@ export function useBlogApi() {
   const sessionUserId = session.user?.id || "";
   const sessionRole = session.user?.role;
 
-  const loadPosts = useCallback(
-    async (search = "") => {
-      const query = search.trim();
-      const searchParam = query ? `?search=${encodeURIComponent(query)}` : "";
-
+  useEffect(() => {
+    const fetchSession = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/feed${searchParam}`, {
-          headers: {
-            "X-User-ID": sessionUserId,
+        const response = await fetch(`${API_BASE_URL}/session`, {
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          setSession(defaultSession);
+          return;
+        }
+
+        const data = (await response.json()) as ApiSessionResponse;
+        if (!data || !("user_id" in data)) {
+          setSession(defaultSession);
+          return;
+        }
+
+        setSession({
+          user: {
+            id: data.user_id,
+            username: data.username,
+            role: data.role,
           },
         });
-        if (response.ok) {
-          const data = (await response.json()) as ApiPostsResponse;
-          setPosts((data.posts || []).map(convertPostRecord));
-        }
-      } catch (error) {
-        console.error("Failed to load posts:", error);
+      } catch {
+        setSession(defaultSession);
       }
-    },
-    [sessionUserId],
-  );
+    };
 
-  // Save session to localStorage
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
+    void fetchSession();
+  }, []);
+
+  const loadPosts = useCallback(async (search = "") => {
+    const query = search.trim();
+    const searchParam = query ? `?search=${encodeURIComponent(query)}` : "";
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/feed${searchParam}`, {
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = (await response.json()) as ApiPostsResponse;
+        setPosts((data.posts || []).map(convertPostRecord));
+      }
+    } catch (error) {
+      console.error("Failed to load posts:", error);
     }
-    dispatchSessionChanged(session);
-    setSessionInStorage(session);
+  }, []);
+
+  useEffect(() => {
+    setSessionState(session);
   }, [session]);
 
   useEffect(() => {
     const fetchPosts = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/feed`, {
-          headers: {
-            "X-User-ID": sessionUserId,
-          },
+          credentials: "include",
         });
         if (response.ok) {
           const data = (await response.json()) as ApiPostsResponse;
@@ -210,7 +226,7 @@ export function useBlogApi() {
     const fetchUsers = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/admin/users`, {
-          headers: { "X-User-ID": sessionUserId },
+          credentials: "include",
         });
         if (response.ok) {
           const data = (await response.json()) as {
@@ -246,6 +262,7 @@ export function useBlogApi() {
       try {
         const response = await fetch(`${API_BASE_URL}/login`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username, password }),
         });
@@ -267,10 +284,6 @@ export function useBlogApi() {
         };
         setSession(newSession);
 
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(USER_ID_KEY, loginData.user_id);
-        }
-
         return { ok: true, message: `Signed in as ${loginData.username}.` };
       } catch {
         return { ok: false, message: "Network error" };
@@ -291,6 +304,7 @@ export function useBlogApi() {
       try {
         const response = await fetch(`${API_BASE_URL}/register`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username, email, password }),
         });
@@ -311,14 +325,10 @@ export function useBlogApi() {
           user: {
             id: registerData.user_id,
             username: registerData.username,
-            role: "user",
+            role: registerData.role,
           },
         };
         setSession(newSession);
-
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(USER_ID_KEY, registerData.user_id);
-        }
 
         return { ok: true, message: "Account created and signed in." };
       } catch {
@@ -330,11 +340,18 @@ export function useBlogApi() {
     [],
   );
 
-  const logout = useCallback(() => {
-    setSession(defaultSession);
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(USER_ID_KEY);
+  const logout = useCallback(async () => {
+    try {
+      await fetch(`${API_BASE_URL}/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // ignore network failures on logout
     }
+
+    setSession(defaultSession);
+    clearSessionState();
   }, []);
 
   const createPost = useCallback(
@@ -351,9 +368,9 @@ export function useBlogApi() {
       try {
         const response = await fetch(`${API_BASE_URL}/feed`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: sessionUser.id,
             title: title.trim(),
             text: text.trim(),
             private: privatePost,
@@ -390,10 +407,10 @@ export function useBlogApi() {
       try {
         const response = await fetch(`${API_BASE_URL}/admin/feed/delete`, {
           method: "DELETE",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             post_id: postId,
-            user_id: sessionUser.id,
           }),
         });
 
@@ -425,10 +442,10 @@ export function useBlogApi() {
       try {
         await fetch(`${API_BASE_URL}/admin/user/delete`, {
           method: "DELETE",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             user_id: userId,
-            current_user_id: sessionUser.id,
           }),
         });
 
@@ -453,10 +470,10 @@ export function useBlogApi() {
       try {
         const response = await fetch(`${API_BASE_URL}/admin/user/promote`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             user_id: userId,
-            current_user_id: sessionUser.id,
           }),
         });
 
@@ -482,10 +499,10 @@ export function useBlogApi() {
       try {
         const response = await fetch(`${API_BASE_URL}/admin/user/demote`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             user_id: userId,
-            current_user_id: sessionUser.id,
           }),
         });
 

@@ -24,7 +24,7 @@ export function AuthPanel({
   onSubmit,
 }: AuthPanelProps) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 lg:self-start">
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-6 lg:self-start w-full">
       <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
@@ -62,7 +62,7 @@ export function AuthPanel({
       </div>
 
       <form
-        className="space-y-3"
+        className="space-y-3 "
         onSubmit={(event) => {
           event.preventDefault();
           onSubmit(form);

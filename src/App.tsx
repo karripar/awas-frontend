@@ -42,6 +42,23 @@ function App() {
   const signedIn = Boolean(session.user);
   const isAdmin = session.user?.role === "admin";
 
+  const resetAllForms = () => {
+    setAuthForm({
+      username: "",
+      email: "",
+      password: "",
+    });
+    setSearch("");
+    setNotice("");
+    setPostForm({
+      title: "",
+      text: "",
+      privatePost: false,
+    });
+    setAuthMode("login");
+    setActiveView("feed");
+  };
+
   useEffect(() => {
     // If user loses admin privileges while admin view is active, reset to feed.
 
@@ -57,7 +74,7 @@ function App() {
       <main className="min-h-screen bg-slate-50 text-slate-900">
         <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-6">
           {notice ? (
-            <p className="mb-4 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+            <p className="mb-4 rounded-lg border max-w-md border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
               {notice}
             </p>
           ) : null}
@@ -85,6 +102,7 @@ function App() {
               if (result.ok) {
                 setAuthMode("login");
                 setActiveView("feed");
+                setAuthForm({ username: "", email: "", password: "" });
               }
             }}
           />
@@ -101,8 +119,8 @@ function App() {
           role={session.user?.role ?? "Not signed in"}
           signedIn={signedIn}
           onLogout={() => {
-            logout();
-            setNotice("");
+            void logout();
+            resetAllForms();
           }}
         />
 
