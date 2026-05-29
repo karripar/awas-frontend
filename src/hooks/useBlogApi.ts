@@ -449,6 +449,10 @@ export function useBlogApi() {
           }),
         });
 
+        setUsers((currentUsers) =>
+          currentUsers.filter((user) => user.id !== userId),
+        );
+
         setPosts((currentPosts) =>
           currentPosts.filter((post) => post.userId !== userId),
         );
@@ -477,7 +481,17 @@ export function useBlogApi() {
           }),
         });
 
-        if (response.ok && sessionUser?.id === userId) {
+        if (!response.ok) {
+          return;
+        }
+
+        setUsers((currentUsers) =>
+          currentUsers.map((user) =>
+            user.id === userId ? { ...user, role: "admin" } : user,
+          ),
+        );
+
+        if (sessionUser.id === userId) {
           setSession({
             user: {
               ...sessionUser,
@@ -506,7 +520,17 @@ export function useBlogApi() {
           }),
         });
 
-        if (response.ok && sessionUser?.id === userId) {
+        if (!response.ok) {
+          return;
+        }
+
+        setUsers((currentUsers) =>
+          currentUsers.map((user) =>
+            user.id === userId ? { ...user, role: "user" } : user,
+          ),
+        );
+
+        if (sessionUser.id === userId) {
           setSession({
             user: {
               ...sessionUser,

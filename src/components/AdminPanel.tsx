@@ -44,24 +44,44 @@ export function AdminPanel({
                   <span className="rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-500">
                     {user.role}
                   </span>
-                  <button
-                    type="button"
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-                    onClick={() => onPromoteUser(user.id)}
-                  >
-                    Promote
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-                    onClick={() => onDemoteUser(user.id)}
-                  >
-                    Demote
-                  </button>
+                  {user.role !== "admin" && (
+                    <button
+                      type="button"
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                      onClick={() => {
+                        if (confirm(`Promote ${user.username} to admin?`)) {
+                          onPromoteUser(user.id);
+                        }
+                      }}
+                    >
+                      Promote
+                    </button>
+                  )}
+                  {user.role === "admin" && (
+                    <button
+                      type="button"
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                      onClick={() => {
+                        if (confirm(`Demote ${user.username} from admin?`)) {
+                          onDemoteUser(user.id);
+                        }
+                      }}
+                    >
+                      Demote
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50"
-                    onClick={() => onDeleteUser(user.id)}
+                    onClick={() => {
+                      if (
+                        confirm(
+                          `Delete user ${user.username}? This action cannot be undone.`,
+                        )
+                      ) {
+                        onDeleteUser(user.id);
+                      }
+                    }}
                   >
                     Delete
                   </button>
@@ -94,7 +114,15 @@ export function AdminPanel({
                   <button
                     type="button"
                     className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50"
-                    onClick={() => onDeletePost(post.id)}
+                    onClick={() => {
+                      if (
+                        confirm(
+                          `Delete post "${post.title}"? This action cannot be undone.`,
+                        )
+                      ) {
+                        onDeletePost(post.id);
+                      }
+                    }}
                   >
                     Delete
                   </button>
