@@ -1,23 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  dispatchSessionChanged,
-  readSessionFromStorage,
-  setSessionInStorage,
-  clearSessionState,
-} from "../lib/session.ts";
+import { dispatchSessionChanged, clearSessionState } from "../lib/session.ts";
 
 declare global {
   interface ImportMetaEnv {
-      readonly VITE_API_BASE_URL?: string;
-      readonly VITE_USER_ID_KEY?: string;
+    readonly VITE_API_BASE_URL?: string;
+    readonly VITE_USER_ID_KEY?: string;
   }
   interface ImportMeta {
     readonly env: ImportMetaEnv;
   }
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000/api";
-const USER_ID_KEY = import.meta.env.VITE_USER_ID_KEY ?? "awas.user_id";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000/api";
 
 export type Role = "user" | "admin";
 
@@ -118,16 +113,6 @@ const defaultSession: SessionState = {
   user: null,
 };
 
-function loadSession(): SessionState {
-  const parsedSession = readSessionFromStorage() as SessionState | null;
-
-  if (!parsedSession?.user) {
-    return defaultSession;
-  }
-
-  return parsedSession;
-}
-
 function convertPostRecord(post: ApiPostRecord): PostRecord {
   return {
     id: post.post_id,
@@ -145,7 +130,7 @@ export function useBlogApi() {
   const [feedPosts, setFeedPosts] = useState<PostRecord[]>([]);
   const [searchResults, setSearchResults] = useState<PostRecord[]>([]);
   const [users, setUsers] = useState<UserRecord[]>([]);
-  const [session, setSession] = useState<SessionState>(loadSession);
+  const [session, setSession] = useState<SessionState>(defaultSession);
   const [isLoading, setIsLoading] = useState(false);
 
   const sessionUser = useMemo(() => session.user, [session.user]);
@@ -186,27 +171,23 @@ export function useBlogApi() {
   }, []);
 
   useEffect(() => {
-    // persist session to storage and notify other listeners
+    // notify other listeners of session changes
     dispatchSessionChanged(session);
-    setSessionInStorage(session);
   }, [session]);
 
-  const loadFeedPosts = useCallback(
-    async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/feed`, {
-          credentials: "include",
-        });
-        if (response.ok) {
-          const data = (await response.json()) as ApiPostsResponse;
-          setFeedPosts((data.posts || []).map(convertPostRecord));
-        }
-      } catch (error) {
-        console.error("Failed to load posts:", error);
+  const loadFeedPosts = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/feed`, {
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = (await response.json()) as ApiPostsResponse;
+        setFeedPosts((data.posts || []).map(convertPostRecord));
       }
-    },
-    [sessionUserId],
-  );
+    } catch (error) {
+      console.error("Failed to load posts:", error);
+    }
+  }, [sessionUserId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -215,7 +196,6 @@ export function useBlogApi() {
 
     return () => window.clearTimeout(timer);
   }, [loadFeedPosts]);
-
 
   const searchPosts = useCallback(
     async (search: string): Promise<AuthResult> => {
@@ -272,7 +252,6 @@ export function useBlogApi() {
 
   useEffect(() => {
     dispatchSessionChanged(session);
-    setSessionInStorage(session);
   }, [session]);
 
   useEffect(() => {
